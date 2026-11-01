@@ -35,7 +35,8 @@ jobs:
           name: generated-youtube-short
           path: out/short.mp4
 
-      - name: Comment Preview Link in GitHub Issue
+      - name: Comment Preview Link on Success
+        if: success()
         uses: github-script@v7
         with:
           script: |
@@ -46,9 +47,28 @@ jobs:
             
             const artifactUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${run_id}`;
 
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               owner: repoOwner,
               repo: repoName,
               issue_number: issue_number,
               body: `🚀 **Your YouTube Short video has been created successfully!**\n\n[📦 Download Video Preview Artifact](${artifactUrl})\n\n*(Click the link above, navigate to the **Artifacts** section at the bottom of the workflow run page, and download **generated-youtube-short** to get your MP4 video)*`
+            });
+
+      - name: Comment Error Notice on Failure
+        if: failure()
+        uses: github-script@v7
+        with:
+          script: |
+            const issue_number = context.payload.issue.number;
+            const run_id = context.runId;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            
+            const logsUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${run_id}`;
+
+            await github.rest.issues.createComment({
+              owner: repoOwner,
+              repo: repoName,
+              issue_number: issue_number,
+              body: `❌ **Oops! Something went wrong while generating your YouTube Short.**\n\nThe build failed during processing or rendering. Please check the [Workflow Error Logs](${logsUrl}) to review the exact traceback.`
             });
