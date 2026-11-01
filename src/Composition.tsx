@@ -3,17 +3,17 @@ import scriptData from "./script.json";
 
 export const ShortComposition = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { durationInFrames } = useVideoConfig();
 
-  // Rule 6: Only smooth zooms, no sudden jumps
-  const scale = interpolate(frame, [0, 450], [1, 1.12], {
+  // Smooth slow continuous zoom throughout the whole video
+  const scale = interpolate(frame, [0, durationInFrames], [1, 1.15], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0b0f19", overflow: "hidden", fontFamily: "system-ui, sans-serif" }}>
-      {/* Dynamic Background with smooth slow zoom */}
+      {/* Dynamic Background */}
       <AbsoluteFill
         style={{
           transform: `scale(${scale})`,
@@ -23,43 +23,43 @@ export const ShortComposition = () => {
           alignItems: "center",
         }}
       >
-        {/* Rule 3: Clean motion graphics / icon placeholder element */}
+        {/* Icon / Graphic Container */}
         <div style={{
           position: "absolute",
-          top: "220px",
-          width: "120px",
-          height: "120px",
-          borderRadius: "30px",
+          top: "240px",
+          width: "130px",
+          height: "130px",
+          borderRadius: "35px",
           background: "linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)",
-          boxShadow: "0 20px 40px rgba(56, 189, 248, 0.3)",
+          boxShadow: "0 25px 50px rgba(56, 189, 248, 0.35)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          fontSize: "56px"
+          fontSize: "60px"
         }}>
           💡
         </div>
       </AbsoluteFill>
 
-      {/* Rule 2 & 4: Bold animated text inside YouTube Safe Zone */}
+      {/* Timed Bold Animated Captions inside YouTube Safe Zone */}
       {scriptData.lines.map((line, index) => {
-        const startFrame = line.start * fps;
-        const endFrame = line.end * fps;
+        const startFrame = line.start;
+        const endFrame = line.end;
         const duration = endFrame - startFrame;
 
         if (frame < startFrame || frame > endFrame) return null;
 
         const opacity = interpolate(
           frame,
-          [startFrame, startFrame + 6, endFrame - 6, endFrame],
+          [startFrame, startFrame + 8, endFrame - 8, endFrame],
           [0, 1, 1, 0],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
         );
 
         const translateY = interpolate(
           frame,
-          [startFrame, startFrame + 8],
-          [30, 0],
+          [startFrame, startFrame + 10],
+          [40, 0],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
         );
 
@@ -69,22 +69,22 @@ export const ShortComposition = () => {
               style={{
                 justifyContent: "center",
                 alignItems: "center",
-                padding: "0 100px",
+                padding: "0 90px",
                 textAlign: "center",
-                // Rule 4: Keeps text in YouTube safe zone (clears bottom caption and right action bar areas)
-                bottom: "120px",
+                // Positioned safely in the middle-lower YouTube safe zone
+                bottom: "140px",
                 top: "auto",
-                height: "400px",
+                height: "500px",
               }}
             >
               <h2
                 style={{
                   color: "#ffffff",
-                  fontSize: "58px",
+                  fontSize: "52px",
                   fontWeight: 900,
-                  lineHeight: "1.3",
+                  lineHeight: "1.35",
                   textTransform: "uppercase",
-                  textShadow: "0px 6px 25px rgba(0,0,0,0.85)",
+                  textShadow: "0px 8px 30px rgba(0,0,0,0.9)",
                   opacity: opacity,
                   transform: `translateY(${translateY}px)`,
                 }}
