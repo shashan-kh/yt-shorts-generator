@@ -1,13 +1,14 @@
+import React from "react";
 import { Composition } from "remotion";
 import { ShortComposition } from "./Composition";
-import scriptData from "./script.json";
+import meta from "./meta.json";
 
-export const Root = () => {
+export const Root: React.FC = () => {
   return (
     <Composition
       id="MyShort"
       component={ShortComposition}
-      durationInFrames={scriptData.durationInFrames || 450}
+      durationInFrames={meta.durationInFrames || 450}
       fps={30}
       width={1080}
       height={1920}
