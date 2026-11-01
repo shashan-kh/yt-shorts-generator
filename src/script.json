@@ -1,8 +1,0 @@
-{
-  "script": "Default placeholder script",
-  "lines": [
-    { "start": 0, "end": 5, "text": "Create YouTube shorts video using the provided script." },
-    { "start": 5, "end": 10, "text": "Keep voice over clear and add bold animated text." },
-    { "start": 10, "end": 15, "text": "Rendered automatically through GitHub actions!" }
-  ]
-}
