@@ -1,6 +1,5 @@
 import fs from "fs";
 import { execSync } from "child_process";
-import { GoogleGenAI } from "@google/genai";
 
 const rawComment = process.env.COMMENT_BODY || "";
 const scriptText =
@@ -13,7 +12,8 @@ console.log(`Processing script: "${scriptText}"`);
 fs.mkdirSync("public", { recursive: true });
 
 // Split script into sentences so every segment has exact voiceover sync
-const sentences = scriptText.match(/[^.!?]+[.!?]+|\s*[^.!?]+$/g) || [scriptText];
+const sentences =
+  scriptText.match(/[^.!?]+[.!?]+|\s*[^.!?]+$/g) || [scriptText];
 const fps = 30;
 let currentFrame = 0;
 const segments = [];
@@ -26,9 +26,11 @@ sentences.forEach((s, i) => {
   const fileName = `vo_${i}.mp3`;
   const filePath = `public/${fileName}`;
 
-  // Escape quotes for bash safety
-  const escaped = cleanText.replace(/"/g, '\\"');
-  execSync(`edge-tts --voice en-US-ChristopherNeural --rate=+5% --text "${escaped}" --write-media ${filePath}`);
+  // Write text to a temp file to avoid bash quote/apostrophe escaping issues
+  fs.writeFileSync("temp_tts.txt", cleanText);
+  execSync(
+    `python3 -m edge_tts --voice en-US-ChristopherNeural --rate=+5% -f temp_tts.txt --write-media ${filePath}`
+  );
 
   // Get exact audio duration in seconds via ffprobe
   const durationStr = execSync(
@@ -51,6 +53,8 @@ sentences.forEach((s, i) => {
   currentFrame += durationFrames;
 });
 
+if (fs.existsSync("temp_tts.txt")) fs.unlinkSync("temp_tts.txt");
+
 // Add 1 second (30 frames) tail buffer
 const totalDurationInFrames = Math.max(90, currentFrame + 30);
 const totalSeconds = Math.ceil(totalDurationInFrames / fps);
@@ -58,23 +62,27 @@ const totalSeconds = Math.ceil(totalDurationInFrames / fps);
 console.log("2. Synthesizing Background Music & Sound Effects via FFmpeg...");
 // Generate warm ambient background chord (C2 + G2)
 execSync(
-  `ffmpeg -y -f lavfi -i "sine=frequency=110:duration=${totalSeconds}" -f lavfi -i "sine=frequency=165:duration=${totalSeconds}" -filter_complex "[0:a][1:a]amix=inputs=2:duration=first,lowpass=f=300,volume=0.06" public/bg-music.mp3`
+  `ffmpeg -y -f lavfi -i "sine=frequency=110:duration=${totalSeconds}" -f lavfi -i "sine=frequency=165:duration=${totalSeconds}" -filter_complex "[0:a][1:a]amix=inputs=2:duration=first,lowpass=f=280,volume=0.05" public/bg-music.mp3`
 );
 
 // Generate soft pop/whoosh sound effect for transitions
 execSync(
-  `ffmpeg -y -f lavfi -i "sine=frequency=520:duration=0.12" -af "afade=t=in:ss=0:d=0.02,afade=t=out:st=0.04:d=0.08,volume=0.15" public/sfx.mp3`
+  `ffmpeg -y -f lavfi -i "sine=frequency=520:duration=0.12" -af "afade=t=in:ss=0:d=0.02,afade=t=out:st=0.04:d=0.08,volume=0.14" public/sfx.mp3`
 );
 
 // Save total duration so Root.tsx knows the exact length of the video
-fs.writeFileSync("src/meta.json", JSON.stringify({ durationInFrames: totalDurationInFrames, segments }, null, 2));
+fs.writeFileSync(
+  "src/meta.json",
+  JSON.stringify({ durationInFrames: totalDurationInFrames, segments }, null, 2)
+);
 
-console.log("3. Prompting Gemini to generate custom Remotion code & SVG assets...");
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is missing! Please add it to your repository's GitHub Actions Secrets.");
+console.log("3. Prompting Gemini API to generate custom Remotion code & SVG assets...");
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  throw new Error(
+    "GEMINI_API_KEY is missing! Please add it to your repository's GitHub Actions Secrets."
+  );
 }
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const userPrompt = `Create Youtube shorts video by using the video script provided. Here is my exact script: ${scriptText}
 
@@ -87,31 +95,58 @@ Edit it in Remotion like a premium Youtube shorts:
 6. Only smooth zooms, no sudden jumps.
 
 ---
-TECHNICAL IMPLEMENTATION REQUIREMENTS FOR REMOTION:
-You must output ONLY valid TypeScript React code for \`src/Composition.tsx\`. Do not wrap in markdown \`\`\`tsx fences or add explanations.
-- Export \`const ShortComposition: React.FC = () => { ... }\`
-- Import ONLY from \`"remotion"\` (\`AbsoluteFill\`, \`Sequence\`, \`Audio\`, \`useCurrentFrame\`, \`useVideoConfig\`, \`interpolate\`, \`spring\`, \`staticFile\`) and \`"react"\`. Do NOT import external icon libraries (create all required bespoke SVG icons, glowing shapes, and clean motion graphics directly inline in JSX!).
-- Here is the exact pre-generated voiceover timing data (at 30 fps, total frames: ${totalDurationInFrames}):
-${JSON.stringify(segments, null, 2)}
+STRICT TECHNICAL REQUIREMENTS FOR REMOTION CODE:
+Output ONLY raw, valid TypeScript React code for \`src/Composition.tsx\`. Do NOT include markdown \`\`\`tsx fences or any text outside the code.
+- Must start with:
+  import React from "react";
+  import { AbsoluteFill, Sequence, Audio, useCurrentFrame, useVideoConfig, interpolate, spring, staticFile } from "remotion";
+- Must export: \`export const ShortComposition: React.FC = () => { ... };\`
+- Do NOT import any external icon libraries or external files. Create all bespoke SVG icons, glowing illustrations, progress bars, and motion graphics inline using standard JSX \`<svg>\`, \`<path>\`, \`<circle>\`, \`<rect>\`, etc.
+- Embed this exact voiceover timing array as a constant inside the file (total video frames: ${totalDurationInFrames} at 30 fps):
+const SEGMENTS = ${JSON.stringify(segments, null, 2)};
 
-- For the Background Music (Rule 5): Include \`<Audio src={staticFile("bg-music.mp3")} volume={0.08} />\` at the root level.
-- For each segment in the array:
-  1. Render a \`<Sequence from={seg.startFrame} durationInFrames={seg.durationInFrames}>\`.
-  2. Inside the Sequence, play the voiceover cleanly (Rule 1): \`<Audio src={staticFile(seg.audioFile)} volume={1.0} />\`.
-  3. Play the soft sound effect on segment transition (Rule 5): \`<Audio src={staticFile("sfx.mp3")} volume={0.12} />\`.
-  4. Rule 2 (Word-by-word bold animated text): Split \`seg.text\` into words and calculate each word's active frame window across \`seg.durationInFrames\`. Highlight the currently spoken word with a vibrant pop animation (scale + color highlight like #38bdf8 or #facc15) while showing the rest of the segment's words in bold uppercase white font with heavy drop shadow.
-  5. Rule 3 (Custom Motion Graphics & Icons): Design a unique, custom animated SVG illustration/icon for EACH segment that visually represents what that sentence is talking about (e.g., footsteps, doctor/heart, chart leveling off at 7,000, dinner plate/clock, glowing checkmark, etc.), animated smoothly with \`spring\` or \`interpolate\`.
-  6. Rule 4 (YouTube Safe Zone): Keep all text and graphics strictly inside \`top: 220px\` to \`bottom: 320px\` and \`paddingLeft: 90px\` to \`paddingRight: 140px\`.
-  7. Rule 6 (Smooth Zooms): Apply a continuous, gentle \`interpolate\` scale zoom across the scene with zero sudden jumps.`;
+- Audio Rules (Rules 1 & 5):
+  - At the root inside \`<AbsoluteFill>\`, render \`<Audio src={staticFile("bg-music.mp3")} volume={0.07} />\`.
+  - Map over \`SEGMENTS\` and render a \`<Sequence key={seg.index} from={seg.startFrame} durationInFrames={seg.durationInFrames}>\` for each segment.
+  - Inside each Sequence, render \`<Audio src={staticFile(seg.audioFile)} volume={1.0} />\` for the clear voiceover, and \`<Audio src={staticFile("sfx.mp3")} volume={0.12} />\` for the transition sound effect.
+- Word-by-Word Animated Text (Rule 2):
+  - Inside each segment component, split \`seg.text.split(" ")\` into words.
+  - Using \`const localFrame = useCurrentFrame();\` (which starts at 0 inside a Sequence), compute which word index is currently active: \`const activeWordIndex = Math.min(words.length - 1, Math.floor((localFrame / seg.durationInFrames) * words.length));\`.
+  - Render all words of the sentence together in a centered flex-wrap container, styling the active word with a vibrant highlight color (e.g. \`#facc15\` or \`#38bdf8\`) and a smooth scale pop (\`transform: scale(1.12)\`), while spoken/upcoming words remain bold white uppercase with strong drop shadow.
+- Custom SVG Motion Graphics (Rule 3):
+  - Create a helper component \`const SceneGraphic: React.FC<{ index: number; frame: number; fps: number }> = ({ index, frame, fps }) => { ... }\` that renders a different, rich, animated vector illustration/icon (260x260px) for each segment index matching the meaning of that sentence (e.g., walking shoes/footsteps, medical cross/doctor, rising graph leveling at 7,000, clock/timer, dinner plate + glucose wave, glowing checklist, etc.). Animate strokes, scales, and floating motion smoothly using \`spring\` and \`interpolate\`.
+- Safe Zone & Smooth Zoom (Rules 4 & 6):
+  - Keep all graphics and text strictly inside \`paddingTop: 240, paddingBottom: 340, paddingLeft: 90, paddingRight: 130\`.
+  - Apply a continuous, gentle slow zoom (\`interpolate(frame, [0, ${totalDurationInFrames}], [1, 1.12])\`) to the background and scene wrapper with zero sudden jumps.`;
 
-const response = await ai.models.generateContent({
-  model: "gemini-2.5-flash",
-  contents: userPrompt,
-});
+const response = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+      },
+    }),
+  }
+);
 
-let generatedCode = response.text || "";
-// Clean markdown codeblocks if Gemini includes them
-generatedCode = generatedCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+if (!response.ok) {
+  const errText = await response.text();
+  throw new Error(`Gemini API HTTP Error (${response.status}): ${errText}`);
+}
+
+const data = await response.json();
+let generatedCode =
+  data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+// Strip markdown fences if present
+generatedCode = generatedCode
+  .replace(/^```[a-zA-Z]*\n/, "")
+  .replace(/\n```$/, "")
+  .trim();
 
 if (!generatedCode.includes("ShortComposition")) {
   throw new Error("Gemini did not return valid ShortComposition code.");
