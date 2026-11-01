@@ -1,0 +1,54 @@
+name: Generate YouTube Short via Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  build-video:
+    if: github.event.issue.pull_request == null && startsWith(github.event.comment.body, '/create-short')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Process Script from Comment
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: node scripts/process-script.js
+
+      - name: Render Remotion Video
+        run: npx remotion render src/Root.tsx MyShort out/short.mp4 --codec=h264
+
+      - name: Upload Video Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-youtube-short
+          path: out/short.mp4
+
+      - name: Comment Preview Link in GitHub Issue
+        uses: github-script@v7
+        with:
+          script: |
+            const issue_number = context.payload.issue.number;
+            const run_id = context.runId;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            
+            const artifactUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${run_id}`;
+
+            github.rest.issues.createComment({
+              owner: repoOwner,
+              repo: repoName,
+              issue_number: issue_number,
+              body: `🚀 **Your YouTube Short video has been created successfully!**\n\n[📦 Download Video Preview Artifact](${artifactUrl})\n\n*(Click the link above, navigate to the **Artifacts** section at the bottom of the workflow run page, and download **generated-youtube-short** to get your MP4 video)*`
+            });
