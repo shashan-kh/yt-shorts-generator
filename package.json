@@ -1,12 +1,14 @@
 {
   "name": "yt-shorts-generator",
-  "version": "1.0.0",
-  "description": "Automated YouTube Shorts generator via GitHub Comments, Gemini, and Remotion",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "AI-Powered YouTube Shorts generator via GitHub Comments, Gemini, Neural TTS, and Remotion",
   "scripts": {
-    "build": "remotion bundle src/Root.tsx dist",
-    "render": "remotion render src/Root.tsx MyShort out/short.mp4"
+    "build": "remotion bundle src/index.ts dist",
+    "render": "remotion render src/index.ts MyShort out/short.mp4"
   },
   "dependencies": {
+    "@google/genai": "^0.1.2",
     "@remotion/cli": "^4.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
