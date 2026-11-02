@@ -207,7 +207,14 @@ async function run() {
     throw new Error("GEMINI_API_KEY is missing from GitHub Actions Secrets!");
   }
 
-  let candidateModels = ["gemini-3.8-flash"];
+  // Prioritize fast, reliable Flash models first
+  let candidateModels = [
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite"
+  ];
+
   try {
     const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     if (listRes.ok) {
@@ -224,14 +231,13 @@ async function run() {
         )
         .map((m) => m.name.replace("models/", ""));
 
-      // Prioritize flash models first for speed, then pro models
-      const flashModels = supported.filter((m) => m.includes("flash"));
-      const proModels = supported.filter((m) => m.includes("pro"));
-      candidateModels = [...new Set(["gemini-3.8-flash", ...flashModels, ...proModels])].slice(0, 5);
-      console.log("Discovered active fallback models:", candidateModels.join(", "));
+      const liteModels = supported.filter((m) => m.includes("lite"));
+      const flashModels = supported.filter((m) => m.includes("flash") && !m.includes("lite") && m !== "gemini-2.5-flash");
+      candidateModels = [...new Set(["gemini-flash-lite-latest", ...liteModels, "gemini-3.8-flash", ...flashModels])].slice(0, 6);
+      console.log("Discovered active models:", candidateModels.join(", "));
     }
   } catch (e) {
-    console.warn("Could not list models dynamically, using default:", e.message);
+    console.warn("Could not list models dynamically, using defaults:", e.message);
   }
 
   const userPrompt = `Create Youtube shorts video by using the video script provided. Here is my exact script: ${scriptText}
@@ -263,7 +269,7 @@ const SEGMENTS = ${JSON.stringify(segments)};
   - Split \`seg.text.split(" ")\` into words. Using \`const localFrame = useCurrentFrame();\`, compute \`const activeWordIndex = Math.min(words.length - 1, Math.floor((localFrame / seg.durationInFrames) * words.length));\`.
   - Render all words of the sentence in a centered flex-wrap container, highlighting the active word in \`#facc15\` with \`transform: scale(1.12)\`.
 - Clean SVG Motion Graphics (Rule 3):
-  - Keep the code concise! Create a clean component \`SceneGraphic\` using simple geometric SVG shapes (\`<circle>\`, \`<rect>\`, \`<polyline>\`, \`<path>\`) switched by \`seg.index % 6\` with \`spring\` scale animations so the code generates quickly.
+  - Keep the code concise! Create a clean component \`SceneGraphic\` using simple geometric SVG shapes (\`<circle>\`, \`<rect>\`, \`<polyline>\`, \`<path>\`) switched by \`seg.index % 6\` with \`spring\` scale animations.
 - Safe Zone & Smooth Zoom (Rules 4 & 6):
   - Keep all graphics and text strictly inside \`paddingTop: 240, paddingBottom: 340, paddingLeft: 90, paddingRight: 130\`.
   - Apply a continuous slow zoom \`interpolate(frame, [0, ${totalDurationInFrames}], [1, 1.12])\` with zero sudden jumps.`;
@@ -313,7 +319,6 @@ const SEGMENTS = ${JSON.stringify(segments)};
 
   if (generatedCode) {
     fs.writeFileSync("src/Composition.tsx", generatedCode);
-    // Validate that Gemini's generated TSX compiles cleanly before rendering
     try {
       console.log("Validating Gemini-generated TSX with Remotion bundler...");
       execSync("npx remotion bundle src/index.ts out/bundle-test", { stdio: "pipe" });
@@ -321,7 +326,6 @@ const SEGMENTS = ${JSON.stringify(segments)};
       console.log("Validation passed!");
     } catch (bundleErr) {
       console.warn("Gemini TSX had a syntax error, switching to built-in Premium Remotion engine:", bundleErr.message);
-      errorLogs.push(`TSX Compiler check on ${usedModel} failed; auto-repaired with built-in engine.`);
       fs.writeFileSync("src/Composition.tsx", buildFallbackComposition(segments, totalDurationInFrames));
     }
   } else {
