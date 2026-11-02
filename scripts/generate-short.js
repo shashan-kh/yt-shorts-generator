@@ -119,33 +119,33 @@ const SEGMENTS = ${JSON.stringify(segments, null, 2)};
   - Keep all graphics and text strictly inside \`paddingTop: 240, paddingBottom: 340, paddingLeft: 90, paddingRight: 130\`.
   - Apply a continuous, gentle slow zoom (\`interpolate(frame, [0, ${totalDurationInFrames}], [1, 1.12])\`) to the background and scene wrapper with zero sudden jumps.`;
 
-async function callGemini(modelName) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-        },
-      }),
+async function callGeminiWithRetry(modelName, maxRetries = 3) {
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      console.log(`Calling ${modelName} (Attempt ${i}/${maxRetries})...`);
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: userPrompt }] }],
+            generationConfig: { temperature: 0.2 },
+          }),
+          // Force timeout after 90 seconds to prevent 5-minute hangs
+          signal: AbortSignal.timeout(90000), 
+        }
+      );
+      if (res.ok) return res;
+      console.warn(`Attempt ${i} failed with status: ${res.status}`);
+    } catch (err) {
+      console.warn(`Attempt ${i} failed: ${err.message}`);
+      if (i === maxRetries) throw err;
     }
-  );
-  return res;
+  }
 }
 
-let response = await callGemini("gemini-3.8-flash");
-if (!response.ok) {
-  console.warn(`gemini-3.8-flash returned ${response.status}, trying gemini-flash-latest...`);
-  response = await callGemini("gemini-flash-latest");
-}
-
-if (!response.ok) {
-  const errText = await response.text();
-  throw new Error(`Gemini API HTTP Error (${response.status}): ${errText}`);
-}
+let response = await callGeminiWithRetry("gemini-3.8-flash");
 
 const data = await response.json();
 let generatedCode =
