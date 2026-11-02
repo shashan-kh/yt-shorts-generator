@@ -76,7 +76,7 @@ fs.writeFileSync(
   JSON.stringify({ durationInFrames: totalDurationInFrames, segments }, null, 2)
 );
 
-console.log("3. Prompting Gemini API to generate custom Remotion code & SVG assets...");
+console.log("3. Prompting Gemini API (gemini-3.8-flash) to generate custom Remotion code & SVG assets...");
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error(
@@ -119,19 +119,28 @@ const SEGMENTS = ${JSON.stringify(segments, null, 2)};
   - Keep all graphics and text strictly inside \`paddingTop: 240, paddingBottom: 340, paddingLeft: 90, paddingRight: 130\`.
   - Apply a continuous, gentle slow zoom (\`interpolate(frame, [0, ${totalDurationInFrames}], [1, 1.12])\`) to the background and scene wrapper with zero sudden jumps.`;
 
-const response = await fetch(
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-      },
-    }),
-  }
-);
+async function callGemini(modelName) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+        },
+      }),
+    }
+  );
+  return res;
+}
+
+let response = await callGemini("gemini-3.8-flash");
+if (!response.ok) {
+  console.warn(`gemini-3.8-flash returned ${response.status}, trying gemini-flash-latest...`);
+  response = await callGemini("gemini-flash-latest");
+}
 
 if (!response.ok) {
   const errText = await response.text();
