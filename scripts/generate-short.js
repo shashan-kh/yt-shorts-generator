@@ -26,13 +26,11 @@ sentences.forEach((s, i) => {
   const fileName = `vo_${i}.mp3`;
   const filePath = `public/${fileName}`;
 
-  // Write text to a temp file to avoid bash quote/apostrophe escaping issues
   fs.writeFileSync("temp_tts.txt", cleanText);
   execSync(
     `python3 -m edge_tts --voice en-US-ChristopherNeural --rate=+5% -f temp_tts.txt --write-media ${filePath}`
   );
 
-  // Get exact audio duration in seconds via ffprobe
   const durationStr = execSync(
     `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ${filePath}`
   )
@@ -55,33 +53,27 @@ sentences.forEach((s, i) => {
 
 if (fs.existsSync("temp_tts.txt")) fs.unlinkSync("temp_tts.txt");
 
-// Add 1 second (30 frames) tail buffer
 const totalDurationInFrames = Math.max(90, currentFrame + 30);
 const totalSeconds = Math.ceil(totalDurationInFrames / fps);
 
 console.log("2. Synthesizing Background Music & Sound Effects via FFmpeg...");
-// Generate warm ambient background chord (C2 + G2)
 execSync(
   `ffmpeg -y -f lavfi -i "sine=frequency=110:duration=${totalSeconds}" -f lavfi -i "sine=frequency=165:duration=${totalSeconds}" -filter_complex "[0:a][1:a]amix=inputs=2:duration=first,lowpass=f=280,volume=0.05" public/bg-music.mp3`
 );
 
-// Generate soft pop/whoosh sound effect for transitions
 execSync(
   `ffmpeg -y -f lavfi -i "sine=frequency=520:duration=0.12" -af "afade=t=in:ss=0:d=0.02,afade=t=out:st=0.04:d=0.08,volume=0.14" public/sfx.mp3`
 );
 
-// Save total duration so Root.tsx knows the exact length of the video
 fs.writeFileSync(
   "src/meta.json",
   JSON.stringify({ durationInFrames: totalDurationInFrames, segments }, null, 2)
 );
 
-console.log("3. Prompting Gemini API (gemini-3.8-flash) to generate custom Remotion code & SVG assets...");
+console.log("3. Prompting Gemini API with Multi-Model Fallbacks...");
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
-  throw new Error(
-    "GEMINI_API_KEY is missing! Please add it to your repository's GitHub Actions Secrets."
-  );
+  throw new Error("GEMINI_API_KEY is missing from GitHub Actions Secrets!");
 }
 
 const userPrompt = `Create Youtube shorts video by using the video script provided. Here is my exact script: ${scriptText}
@@ -119,47 +111,57 @@ const SEGMENTS = ${JSON.stringify(segments, null, 2)};
   - Keep all graphics and text strictly inside \`paddingTop: 240, paddingBottom: 340, paddingLeft: 90, paddingRight: 130\`.
   - Apply a continuous, gentle slow zoom (\`interpolate(frame, [0, ${totalDurationInFrames}], [1, 1.12])\`) to the background and scene wrapper with zero sudden jumps.`;
 
-async function callGeminiWithRetry(modelName, maxRetries = 3) {
-  for (let i = 1; i <= maxRetries; i++) {
-    try {
-      console.log(`Calling ${modelName} (Attempt ${i}/${maxRetries})...`);
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: userPrompt }] }],
-            generationConfig: { temperature: 0.2 },
-          }),
-          // Force timeout after 90 seconds to prevent 5-minute hangs
-          signal: AbortSignal.timeout(90000), 
-        }
-      );
-      if (res.ok) return res;
-      console.warn(`Attempt ${i} failed with status: ${res.status}`);
-    } catch (err) {
-      console.warn(`Attempt ${i} failed: ${err.message}`);
-      if (i === maxRetries) throw err;
+// Fallback models chain to bypass rate limits (429) or not-found errors (404)
+const modelsToTry = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-flash-latest"];
+let response = null;
+let usedModel = "";
+
+for (const model of modelsToTry) {
+  try {
+    console.log(`Trying model: ${model}...`);
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: { temperature: 0.2 },
+        }),
+        signal: AbortSignal.timeout(90000),
+      }
+    );
+
+    if (res.ok) {
+      response = res;
+      usedModel = model;
+      console.log(`Successfully connected using model: ${model}`);
+      break;
+    } else {
+      const errBody = await res.text();
+      console.warn(`Model ${model} failed with status ${res.status}: ${errBody}`);
     }
+  } catch (err) {
+    console.warn(`Model ${model} threw error: ${err.message}`);
   }
 }
 
-let response = await callGeminiWithRetry("gemini-3.8-flash");
+if (!response) {
+  throw new Error("All Gemini fallback models failed due to rate limits or network timeout. Please wait a minute and try again.");
+}
 
 const data = await response.json();
 let generatedCode =
   data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-// Strip markdown fences if present
 generatedCode = generatedCode
   .replace(/^```[a-zA-Z]*\n/, "")
   .replace(/\n```$/, "")
   .trim();
 
 if (!generatedCode.includes("ShortComposition")) {
-  throw new Error("Gemini did not return valid ShortComposition code.");
+  throw new Error(`Gemini (${usedModel}) did not return valid ShortComposition code.`);
 }
 
 fs.writeFileSync("src/Composition.tsx", generatedCode);
-console.log("Successfully generated custom src/Composition.tsx via Gemini!");
+console.log(`Successfully generated custom src/Composition.tsx via ${usedModel}!`);
