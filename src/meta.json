@@ -1,4 +1,117 @@
 {
-  "durationInFrames": 450,
-  "segments": []
+  "durationInFrames": 1592,
+  "segments": [
+    {
+      "index": 0,
+      "text": "Stop trying to hit 10,000 steps.",
+      "audioFile": "vo_0.mp3",
+      "startFrame": 0,
+      "durationInFrames": 97,
+      "endFrame": 97
+    },
+    {
+      "index": 1,
+      "text": "Doctors say it's not the number that matters.",
+      "audioFile": "vo_1.mp3",
+      "startFrame": 97,
+      "durationInFrames": 93,
+      "endFrame": 190
+    },
+    {
+      "index": 2,
+      "text": "Large studies found the health benefits start climbing well before 10,000, and they begin to level off around 7,000 steps a day.",
+      "audioFile": "vo_2.mp3",
+      "startFrame": 190,
+      "durationInFrames": 243,
+      "endFrame": 433
+    },
+    {
+      "index": 3,
+      "text": "That's roughly 30 to 40 minutes of walking.",
+      "audioFile": "vo_3.mp3",
+      "startFrame": 433,
+      "durationInFrames": 100,
+      "endFrame": 533
+    },
+    {
+      "index": 4,
+      "text": "But here's the trick almost nobody uses: walk for just 10 minutes after your biggest meal.",
+      "audioFile": "vo_4.mp3",
+      "startFrame": 533,
+      "durationInFrames": 170,
+      "endFrame": 703
+    },
+    {
+      "index": 5,
+      "text": "It helps your body handle the sugar spike from that meal, which is better for your energy and your heart.",
+      "audioFile": "vo_5.mp3",
+      "startFrame": 703,
+      "durationInFrames": 175,
+      "endFrame": 878
+    },
+    {
+      "index": 6,
+      "text": "So your plan is simple.",
+      "audioFile": "vo_6.mp3",
+      "startFrame": 878,
+      "durationInFrames": 70,
+      "endFrame": 948
+    },
+    {
+      "index": 7,
+      "text": "Seven thousand steps a day.",
+      "audioFile": "vo_7.mp3",
+      "startFrame": 948,
+      "durationInFrames": 79,
+      "endFrame": 1027
+    },
+    {
+      "index": 8,
+      "text": "Ten minutes after dinner.",
+      "audioFile": "vo_8.mp3",
+      "startFrame": 1027,
+      "durationInFrames": 65,
+      "endFrame": 1092
+    },
+    {
+      "index": 9,
+      "text": "That's it.",
+      "audioFile": "vo_9.mp3",
+      "startFrame": 1092,
+      "durationInFrames": 57,
+      "endFrame": 1149
+    },
+    {
+      "index": 10,
+      "text": "No gym, no app, no money.",
+      "audioFile": "vo_10.mp3",
+      "startFrame": 1149,
+      "durationInFrames": 93,
+      "endFrame": 1242
+    },
+    {
+      "index": 11,
+      "text": "Save this, and tonight after dinner, go for a walk.",
+      "audioFile": "vo_11.mp3",
+      "startFrame": 1242,
+      "durationInFrames": 122,
+      "endFrame": 1364
+    },
+    {
+      "index": 12,
+      "text": "Want to know why 10,000 steps became the standard in the first place?",
+      "audioFile": "vo_12.mp3",
+      "startFrame": 1364,
+      "durationInFrames": 135,
+      "endFrame": 1499
+    },
+    {
+      "index": 13,
+      "text": "It wasn't science...",
+      "audioFile": "vo_13.mp3",
+      "startFrame": 1499,
+      "durationInFrames": 63,
+      "endFrame": 1562
+    }
+  ]
 }
