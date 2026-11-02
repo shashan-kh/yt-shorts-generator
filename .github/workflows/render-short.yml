@@ -31,6 +31,7 @@ jobs:
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/generate-short.js
 
       - name: Render Remotion Video
@@ -77,5 +78,5 @@ jobs:
               owner: repoOwner,
               repo: repoName,
               issue_number: issue_number,
-              body: `❌ **Oops! Something went wrong while generating your YouTube Short.**\n\nPlease check the [Workflow Error Logs](${logsUrl}) to verify if your \`GEMINI_API_KEY\` is set or if an error occurred.`
+              body: `❌ **Oops! Something went wrong while generating your YouTube Short.**\n\nPlease check the [Workflow Error Logs](${logsUrl}) for the full traceback.`
             });
