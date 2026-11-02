@@ -111,8 +111,8 @@ const SEGMENTS = ${JSON.stringify(segments, null, 2)};
   - Keep all graphics and text strictly inside \`paddingTop: 240, paddingBottom: 340, paddingLeft: 90, paddingRight: 130\`.
   - Apply a continuous, gentle slow zoom (\`interpolate(frame, [0, ${totalDurationInFrames}], [1, 1.12])\`) to the background and scene wrapper with zero sudden jumps.`;
 
-// Fallback models chain to bypass rate limits (429) or not-found errors (404)
-const modelsToTry = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-flash-latest"];
+// Removed unsupported gemini-1.5-flash. Added generic gemini-flash and gemini-2.0-flash fallbacks.
+const modelsToTry = ["gemini-3.8-flash", "gemini-2.0-flash", "gemini-flash"];
 let response = null;
 let usedModel = "";
 
